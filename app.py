@@ -1,5 +1,4 @@
-# Streamlit app code 
-streamlit_code = """
+
 import streamlit as st
 import pandas as pd
 import pickle
@@ -11,6 +10,7 @@ try:
     popular_df = pickle.load(open('popular.pkl', 'rb'))
     pt = pickle.load(open('pt.pkl', 'rb'))
     books = pickle.load(open('books.pkl', 'rb'))
+    books = books.reset_index(drop=True)
     similarity_scores = pickle.load(open('similarity_scores.pkl', 'rb'))
 except FileNotFoundError as e:
     st.error(f"Pickle file not found: {str(e)}. Ensure popular.pkl, pt.pkl, books.pkl, and similarity_scores.pkl are in the directory.")
@@ -28,20 +28,38 @@ tfidf_matrix = tfidf.fit_transform(books['features'])
 popular_books = popular_df['Book-Title'].tolist()[:5]
 
 # Function for content-based recommendations using TF-IDF cosine similarity
+# Function for content-based recommendations using TF-IDF cosine similarity
 def get_content_recs(selected_title, top_n=6):
     try:
-        selected_idx = books[books['Book-Title'] == selected_title].index[0]
-        sim_scores = cosine_similarity(tfidf_matrix[selected_idx], tfidf_matrix)[0]
-        sim_scores = sorted(enumerate(sim_scores), key=lambda x: x[1], reverse=True)[1:top_n+1]
-        rec_indices = [i for i, score in sim_scores]
-        return books.iloc[rec_indices][['Book-Title', 'Image-URL-M', 'Image-URL-S']].values.tolist()
-    except IndexError:
-        st.warning(f"No content-based recommendations for '{selected_title}' due to missing index.")
-        return []
+
+        matches = books[books['Book-Title'] == selected_title]
+
+        if matches.empty:
+            st.warning(f"Book not found: {selected_title}")
+            return []
+
+        selected_idx = matches.index[0]
+
+        sim_scores = cosine_similarity(
+            tfidf_matrix[selected_idx:selected_idx+1],
+            tfidf_matrix
+        )[0]
+
+        sim_scores = sorted(
+            enumerate(sim_scores),
+            key=lambda x: x[1],
+            reverse=True
+        )[1:top_n+1]
+
+        rec_indices = [i for i, _ in sim_scores]
+
+        return books.iloc[rec_indices][
+            ['Book-Title', 'Image-URL-M', 'Image-URL-S']
+        ].values.tolist()
+
     except Exception as e:
         st.error(f"Error in content-based recommendations: {str(e)}")
         return []
-
 # Function for collaborative recommendations using similarity scores
 def get_collab_recs(selected_title, top_n=6):
     try:
@@ -165,4 +183,3 @@ display_clickable_images(popular_data)
 selected_title = st.session_state.get('selected_title', None)
 if selected_title:
     display_recommendations(selected_title)
-"""
